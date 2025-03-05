@@ -106,11 +106,11 @@ class User(models.Model):
 Register the Model:
 Open users/admin.py and add:
 
-`
+```
 from django.contrib import admin
 from .models import User
 
-admin.site.register(User)`
+admin.site.register(User)```
 
 Make Migrations:
     In your VS Code terminal (with (myenv) active), run:
@@ -127,7 +127,8 @@ Inspect the Database:
 
 8. Create a Serializer
 In your users folder, create a new file serializers.py and add:
-```from rest_framework import serializers
+```
+from rest_framework import serializers
 from .models import User
 
 class UserSerializer(serializers.ModelSerializer):
@@ -154,11 +155,13 @@ class UserSerializer(serializers.ModelSerializer):
             password=validation_data['password']
         )
         user.save()
-        return user```
+        return user
+```
 
 9. Create a Registration View:
 Open users/views.py and replace its contents with:
-```from rest_framework.decorators import api_view
+```
+from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status
 from .serializers import UserSerializer
@@ -174,18 +177,21 @@ def register_user(request):
 # Keep hello_world for testing
 @api_view(['GET'])
 def hello_world(request):
-    return Response({"message": "Hello, World!"})```
+    return Response({"message": "Hello, World!"})
+```
 
 10. Update URL Routing:
 Open users/urls.py and ensure it includes the registration endpoint:
 
-```from django.urls import path
+```
+from django.urls import path
 from .views import hello_world, register_user
 
 urlpatterns = [
     path('hello/', hello_world, name='hello_world'),
     path('register/', register_user, name='register_user'),
-]```
+]
+```
 
 11. Send a POST request to http://127.0.0.1:8000/api/register/ with:
 
@@ -206,3 +212,135 @@ Update serializers.py
 12.1 Verify Hashing
 Connect to PostgreSQL: psql -U postgres -d myapi_db.
 Query: SELECT fullname, password FROM users_user WHERE fullname = 'Jane Doe';
+
+13 Create a Login Endpoint
+
+Update serializers.py:
+```
+from django.contrib.auth.hashers import make_password, check_password
+
+class LoginSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+    password = serializers.CharField(write_only=True)
+
+    def validate(self, data):
+        email = data.get('email')
+        password = data.get('password')
+        try:
+            user = User.objects.get(email=email)
+            if not check_password(password, user.password):
+                raise serializers.ValidationError({"password": "Incorrect password."})
+        except User.DoesNotExist:
+            raise serializers.ValidationError({"email": "User with this email does not exist."})
+        return {"user": user}
+```
+
+Update views.py:
+
+```
+from .serializers import UserSerializer, LoginSerializer
+
+@api_view(['POST'])
+def login_user(request):
+    serializer = LoginSerializer(data=request.data)
+    if serializer.is_valid():
+        user = serializer.validated_data['user']
+        return Response({"message": f"Welcome, {user.fullname}!"}, status=status.HTTP_200_OK)
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+```
+
+Update urls.py:
+
+```
+from django.urls import path
+from .views import hello_world, register_user, login_user
+
+urlpatterns = [
+    path('hello/', hello_world, name='hello_world'),
+    path('register/', register_user, name='register_user'),
+    path('login/', login_user, name='login_user'),
+]
+```
+
+Send a POST request to http://127.0.0.1:8000/api/login/ with:
+```
+{
+    "email": "jane@example.com",
+    "password": "pass123"
+}
+```
+URL: http://127.0.0.1:8000/api/login/ (with slash).
+Method: POST.
+Body (raw JSON):
+
+14. Update views.py:
+
+```
+@api_view(['POST'])
+def login_user(request):
+    serializer = LoginSerializer(data=request.data)
+    if serializer.is_valid():
+        user = serializer.validated_data['user']
+        user_data = {
+            "fullname": user.fullname,
+            "email": user.email,
+            "mobile_number": user.mobile_number,
+            "referral_code": user.referral_code
+        }
+        return Response({
+            "message": f"Welcome, {user.fullname}!",
+            "user": user_data
+        }, status=status.HTTP_200_OK)
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+```
+
+Test It:
+
+- Run the server: python manage.py runserver.
+- In Postman, send a POST request to http://127.0.0.1:8000/api/login/ with:
+
+json
+```
+{
+    "email": "jane@example.com",
+    "password": "pass123"
+}
+```
+
+Steps to Add JWT Authentication
+✅ Install the package
+✅ Update settings.py
+✅ Add JWT login/logout endpoints
+✅ Protect views with authentication
+
+```
+pip install djangorestframework-simplejwt
+```
+
+2️⃣ Update settings.py
+
+INSTALLED_APPS = [
+
+    'rest_framework_simplejwt',  # Added JWT package
+]
+
+3️⃣ Add JWT URLs (users/urls.py)
+
+from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
+
+    path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),  # Refresh Token
+
+4️⃣ Protect Views with Authentication
+
+Modify users/views.py:
+
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+from rest_framework import status
+from .serializers import UserSerializer
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])  # Protect this view
+def hello_world(request):
+    return Response({"message": f"Hello, {request.user.fullname}!"})

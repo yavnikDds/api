@@ -6,7 +6,7 @@ class User(models.Model):
     mobile_number = models.CharField(max_length=15, unique=True)
     referral_code = models.CharField(max_length=50, blank=True, null=True)
     password = models.CharField(max_length=128) #store hashed password
-    confirm_password = models.CharField(max_length=128)
+    # confirm_password = models.CharField(max_length=128)
     created_at = models.DateTimeField(auto_now_add=True)
 
     # def save(self, *args, **kwargs):

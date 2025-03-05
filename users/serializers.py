@@ -1,8 +1,10 @@
 from rest_framework import serializers
 from .models import User
 from django.contrib.auth.hashers import make_password, check_password
+import uuid
 
 class UserSerializer(serializers.ModelSerializer):
+    confirm_password = serializers.CharField(write_only=True)  # Add as a serializer field, not model field
     class Meta:
         model = User
         fields = ['fullname', 'email', 'mobile_number', 'referral_code', 'password', 'confirm_password']
